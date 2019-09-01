@@ -1,0 +1,76 @@
+version: "3"
+services:
+  ldap:
+    image: dcm4che/slapd-dcm4chee:2.4.44-18.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "389:389"
+      - "636:636"
+    env_file: docker-compose.env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/ldap:/var/lib/ldap
+      - /var/local/dcm4chee-arc/slapd.d:/etc/ldap/slapd.d
+  keycloak:
+    image: dcm4che/keycloak:6.0.1
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "8880:8880"
+      - "8843:8843"
+      - "8990:8990"
+      - "8993:8993"
+    env_file: docker-compose.env
+    environment:
+      HTTP_PORT: 8880
+      HTTPS_PORT: 8843
+      MANAGEMENT_HTTP_PORT: 8990
+      MANAGEMENT_HTTPS_PORT: 8993
+      KEYCLOAK_WAIT_FOR: ldap:389
+    depends_on:
+      - ldap
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/keycloak:/opt/keycloak/standalone
+  db:
+    image: dcm4che/postgres-dcm4chee:11.2-18
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+    ports:
+      - "5432:5432"
+    env_file: docker-compose.env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/db:/var/lib/postgresql/data
+  arc:
+    image: dcm4che/dcm4chee-arc-psql:5.18.0-secure
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "9990:9990"
+      - "9993:9993"
+      - "11112:11112"
+      - "2575:2575"
+    env_file: docker-compose.env
+    environment:
+      WILDFLY_CHOWN: /opt/wildfly/standalone /storage
+      WILDFLY_WAIT_FOR: ldap:389 db:5432
+    depends_on:
+      - ldap
+      - keycloak
+      - db
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /var/local/dcm4chee-arc/wildfly:/opt/wildfly/standalone
+      - /var/local/dcm4chee-arc/storage:/storage
